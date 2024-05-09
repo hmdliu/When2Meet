@@ -1,9 +1,18 @@
 
-package main.java.when2meet.gui;
+package when2meet.gui;
 
+import java.net.URI;
+import java.net.http.*;
+import java.net.URLEncoder;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import when2meet.gui.mapper.Event;
 
 import java.awt.event.*;
 import javax.swing.*;
@@ -14,6 +23,13 @@ public class CreateEventFrame extends JFrame {
     private static CreateEventFrame instance;
     private static final int MAX_SELECTIONS = 5;
     private static final int NUM_CANDIDATES = 30;
+    private static final String HOST = "http://localhost:8080/";
+    private static final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_2)
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private JPanel mainPanel;
 
     // Constructor
     public CreateEventFrame() {
@@ -62,7 +78,7 @@ public class CreateEventFrame extends JFrame {
         add(topPanel, BorderLayout.NORTH);
         
         // Main panel for date and time selections
-        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel = new JPanel(new BorderLayout(10, 10));
         
         // Calendar selection part
         JPanel calendarPanel = new JPanel(new GridLayout(1, 2, 0, 10));
@@ -84,7 +100,7 @@ public class CreateEventFrame extends JFrame {
                 if (selectedModel.size() < MAX_SELECTIONS) {
                     moveDate(candidateDates, candidateModel, selectedModel);
                 } else {
-                    JOptionPane.showMessageDialog(candidateDates, 
+                    JOptionPane.showMessageDialog(mainPanel, 
                         "You may select at most " + MAX_SELECTIONS + " days.",
                         "Information",
                         JOptionPane.INFORMATION_MESSAGE);
@@ -130,7 +146,7 @@ public class CreateEventFrame extends JFrame {
             // Check event name
             String eventName = eventNameField.getText();
             if (eventName.length() == 0) {
-                JOptionPane.showMessageDialog(createButton, 
+                JOptionPane.showMessageDialog(mainPanel, 
                     "The event name cannot be empty.",
                     "Information",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -142,7 +158,7 @@ public class CreateEventFrame extends JFrame {
                 dateList.add(selectedModel.get(i));
             }
             if (dateList.size() == 0) {
-                JOptionPane.showMessageDialog(createButton, 
+                JOptionPane.showMessageDialog(mainPanel, 
                     "No date has been selected.",
                     "Information",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -156,6 +172,7 @@ public class CreateEventFrame extends JFrame {
                 dateList + ". Starting from " + times[startTimeIndex] +
                 " to " + times[endTimeIndex] + "."
             );
+            submitEvent(eventName, dateList, startTimeIndex+6, endTimeIndex+6);
         });
         bottomPanel.add(createButton);
         add(bottomPanel, BorderLayout.SOUTH);
@@ -179,6 +196,57 @@ public class CreateEventFrame extends JFrame {
             for (String s : list) {
                 targetModel.addElement(s);
             }
+        }
+    }
+
+    // Send event info to the server
+    private void submitEvent(String eventName, ArrayList<String> dateList,
+                             int startTime, int endTime) {
+        // Convert date format & merge to a single string
+        StringBuilder formattedDates = new StringBuilder();
+        SimpleDateFormat srcFormat = new SimpleDateFormat("MM/dd/yyyy (EEEE)");
+        SimpleDateFormat dstFormat = new SimpleDateFormat("MM/dd EEE");
+        for (String dateStr : dateList) {
+            try {
+                Date date = srcFormat.parse(dateStr);
+                formattedDates.append(dstFormat.format(date)).append("-");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (formattedDates.length() > 0) {
+            formattedDates.setLength(formattedDates.length() - 1);
+        }
+        String dates = formattedDates.toString();
+        // Send request
+        String encodedEventName = URLEncoder.encode(eventName, StandardCharsets.UTF_8);
+        String encodedDates = URLEncoder.encode(dates, StandardCharsets.UTF_8);
+        String queryParams = String.format("eventName=%s&dates=%s&startTime=%d&endTime=%d", 
+            encodedEventName, encodedDates, startTime, endTime);
+        logMessage("Event request: " + queryParams);
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(HOST + "events/create?" + queryParams))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.noBody())
+            .build();
+        try {
+            HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                logMessage("Event created successfully: " + response.body());
+                Event event = objectMapper.readValue(response.body(), Event.class);
+                dispose();
+                logMessage("Invoking JoinEventFrame.");
+                JoinEventFrame.getInstance(event);
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "Error: " + response.body(),
+                    "Information",
+                    JOptionPane.INFORMATION_MESSAGE);
+                logMessage("Failed to create event. Status code: " +
+                           response.statusCode() + ". Info: " + response.body());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
