@@ -23,3 +23,7 @@ mvn spring-boot:run
 mvn compile
 mvn exec:java -Dexec.mainClass="when2meet.gui.MainFrame"
 ```
+
+### Demo
+
+<img src="./fig/create_event.png" alt="Create Event" height="400"/> <img src="./fig/join_event.png" alt="Join Event" height="400"/>
