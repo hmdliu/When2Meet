@@ -29,6 +29,11 @@ public class CreateEventFrame extends JFrame {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String[] TIMES = {
+        "6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM",
+        "11:00 AM", "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM",
+        "4:00 PM", "5:00 PM","6:00 PM", "7:00 PM", "8:00 PM",
+        "9:00 PM", "10:00 PM", "11:00 PM"};
     private JPanel mainPanel;
 
     // Constructor
@@ -119,11 +124,8 @@ public class CreateEventFrame extends JFrame {
         // Time selection part
         JPanel timePanel = new JPanel(new GridLayout(1, 4, 10, 10));
         timePanel.setBorder(BorderFactory.createTitledBorder("What times might work?"));
-        String[] times = {"6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-                          "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM", "7:00 PM",
-                          "8:00 PM", "9:00 PM", "10:00 PM", "11:00 PM"};
-        JComboBox<String> startTimeCombo = new JComboBox<>(Arrays.copyOf(times, times.length-1));
-        JComboBox<String> endTimeCombo = new JComboBox<>(times);
+        JComboBox<String> startTimeCombo = new JComboBox<>(Arrays.copyOf(TIMES, TIMES.length-1));
+        JComboBox<String> endTimeCombo = new JComboBox<>(TIMES);
         startTimeCombo.setSelectedItem("9:00 AM");
         endTimeCombo.setSelectedItem("5:00 PM");
         timePanel.add(new JLabel("No earlier than:"));
@@ -133,8 +135,8 @@ public class CreateEventFrame extends JFrame {
         startTimeCombo.addActionListener(e -> {
             int start = startTimeCombo.getSelectedIndex();
             endTimeCombo.removeAllItems();
-            for (int i = start + 1; i < times.length; i++) {
-                endTimeCombo.addItem(times[i]);
+            for (int i = start + 1; i < TIMES.length; i++) {
+                endTimeCombo.addItem(TIMES[i]);
             }
         });
         mainPanel.add(timePanel, BorderLayout.CENTER);
@@ -165,18 +167,30 @@ public class CreateEventFrame extends JFrame {
                 return;
             }
             // Check time duration
-            int startTimeIndex = startTimeCombo.getSelectedIndex();
-            int endTimeIndex = endTimeCombo.getSelectedIndex();
+            String startTimeStr = startTimeCombo.getSelectedItem().toString();
+            String endTimeStr = endTimeCombo.getSelectedItem().toString();
+            int startTimeIndex = indexOf(TIMES, startTimeStr);
+            int endTimeIndex = indexOf(TIMES, endTimeStr);
             logMessage(
                 "Submitting event [" + eventName + "] with candidate dates " + 
-                dateList + ". Starting from " + times[startTimeIndex] +
-                " to " + times[endTimeIndex] + "."
+                dateList + ". Starting from " + TIMES[startTimeIndex] +
+                " to " + TIMES[endTimeIndex] + "."
             );
             submitEvent(eventName, dateList, startTimeIndex+6, endTimeIndex+6);
         });
         bottomPanel.add(createButton);
         add(bottomPanel, BorderLayout.SOUTH);
         add(mainPanel, BorderLayout.CENTER);
+    }
+
+    // Helper function for finding time indices
+    public static int indexOf(String[] array, String value) {
+        for (int i = 0; i < array.length; i++) {
+            if (array[i].equals(value)) {
+                return i;
+            }
+        }
+        return -1;
     }
     
     // Add or remove selected dates
